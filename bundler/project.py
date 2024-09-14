@@ -9,6 +9,8 @@ import utils
 
 # Base class for anything that can be copied into a bundle with a
 # source and dest.
+
+
 class Path:
     def __init__(self, source, dest=None, recurse=False):
         if source and len(source) == 0:
@@ -20,7 +22,7 @@ class Path:
             source = os.path.normpath(source)
         if dest and os.path.isabs(dest):
             dest = os.path.normpath(dest)
-            
+
         self.source = source
         self.dest = dest
         self.recurse = recurse
@@ -37,7 +39,7 @@ class Path:
             recurse = False
         if validate:
             Path.validate(source, dest)
-            
+
         return Path(source, dest, recurse)
     from_node = classmethod(from_node)
 
@@ -49,16 +51,17 @@ class Path:
 
         if not source or len(source) == 0:
             raise Exception("The source path cannot be empty")
-        
+
         if source.startswith("${bundle}"):
             raise Exception("The source path cannot use a ${bundle} macro")
 
         if dest and dest.startswith("${prefix"):
-            raise Exception("The destination path cannot use a ${prefix} macro")
+            raise Exception(
+                "The destination path cannot use a ${prefix} macro")
 
         if not os.path.isabs(source):
-            if not (source.startswith("${project}") or source.startswith("${env:") or \
-                    source.startswith("${pkg:") or source.startswith("${prefix}") or \
+            if not (source.startswith("${project}") or source.startswith("${env:") or
+                    source.startswith("${pkg:") or source.startswith("${prefix}") or
                     source.startswith("${prefix:")):
                 raise Exception("The source path must be absolute or use one of the "
                                 "predefined macros ${project}, ${prefix}, ${prefix:*}, "
@@ -80,24 +83,30 @@ class Path:
     validate = classmethod(validate)
 
 # Used for anything that has a name and value.
+
+
 class Variable:
     def __init__(self, node):
         self.name = node.getAttribute("name")
         self.value = utils.node_get_string(node)
+
 
 class Environment:
     def __init__(self, node):
         self.runtime_variables = []
         self.scripts = []
 
-        variables = utils.node_get_elements_by_tag_name(node, "runtime-variable")
+        variables = utils.node_get_elements_by_tag_name(
+            node, "runtime-variable")
         for child in variables:
             self.runtime_variables.append(Variable(child))
 
         scripts = utils.node_get_elements_by_tag_name(node, "script")
         for child in scripts:
-            script = Path(utils.node_get_string(child), "${bundle}/Resources/Scripts")
+            script = Path(utils.node_get_string(child),
+                          "${bundle}/Resources/Scripts")
             self.scripts.append(script)
+
 
 class Meta:
     def __init__(self, node):
@@ -108,21 +117,24 @@ class Meta:
             name = child.getAttribute("name")
             if len(name) == 0:
                 name = "default"
-            value = utils.evaluate_environment_variables(utils.node_get_string(child))
+            value = utils.evaluate_environment_variables(
+                utils.node_get_string(child))
             self.prefixes[name] = value
 
         child = utils.node_get_element_by_tag_name(node, "image")
         if child:
-            pass # FIXME: implement
-        
-        child = utils.node_get_element_by_tag_name(node, "run-install-name-tool")
+            pass  # FIXME: implement
+
+        child = utils.node_get_element_by_tag_name(
+            node, "run-install-name-tool")
         if child:
             self.run_install_name_tool = True
         else:
             self.run_install_name_tool = False
 
         child = utils.node_get_element_by_tag_name(node, "destination")
-        self.overwrite = utils.node_get_property_boolean(child, "overwrite", False)
+        self.overwrite = utils.node_get_property_boolean(
+            child, "overwrite", False)
         self.dest = utils.node_get_string(child, "${project}")
 
         child = utils.node_get_element_by_tag_name(node, "gtk")
@@ -130,6 +142,7 @@ class Meta:
             self.gtk = utils.node_get_string(child)
         else:
             self.gtk = "gtk+-2.0"
+
 
 class Framework(Path):
     def __init__(self, source):
@@ -147,6 +160,7 @@ class Framework(Path):
         return "${bundle}/Contents/Frameworks/" + tail
     get_dest_path_from_source = classmethod(get_dest_path_from_source)
 
+
 class Binary(Path):
     def __init__(self, source, dest):
         Path.__init__(self, source, dest)
@@ -159,6 +173,7 @@ class Binary(Path):
 
         return binary
     from_node = classmethod(from_node)
+
 
 class Translation(Path):
     def __init__(self, name, sourcepath, destpath):
@@ -178,14 +193,13 @@ class Translation(Path):
     from_node = classmethod(from_node)
 
 
-        
-
 class Data(Path):
     pass
 
+
 class IconTheme:
     ICONS_NONE, ICONS_ALL, ICONS_AUTO = range(3)
-    
+
     def __init__(self, name, icons=ICONS_AUTO):
         self.name = name
         self.source = "${prefix}/share/icons/" + name
@@ -196,7 +210,7 @@ class IconTheme:
         name = utils.node_get_string(node)
         if not name:
             raise Exception("Icon theme must have a 'name' property")
-        
+
         string = node.getAttribute("icons")
         if string == "all":
             icons = IconTheme.ICONS_ALL
@@ -204,9 +218,10 @@ class IconTheme:
             icons = IconTheme.ICONS_NONE
         elif string == "auto" or len(string) == 0:
             icons = IconTheme.ICONS_AUTO
-            
+
         return IconTheme(name, icons)
     from_node = classmethod(from_node)
+
 
 class Project:
     def __init__(self, project_path=None):
@@ -219,7 +234,8 @@ class Project:
             try:
                 doc = xml.dom.minidom.parse(project_path)
                 # Get the first app-bundle tag and ignore any others.
-                self.root = utils.node_get_element_by_tag_name(doc, "app-bundle")
+                self.root = utils.node_get_element_by_tag_name(
+                    doc, "app-bundle")
             except:
                 print "Could not load project %s:" % (project_path)
                 raise
@@ -239,44 +255,45 @@ class Project:
             else:
                 raise
         self.name = plist.CFBundleExecutable
- 
+
     """
      Replace ${env:?}, ${prefix}, ${prefix:?}, ${project}, ${gtk}, ${gtkdir},
      ${gtkversion}, ${pkg:?:?}, ${bundle}, and ${name} variables.
     """
+
     def evaluate_path(self, path, include_bundle=True):
-        p = re.compile("^\${prefix}")
+        p = re.compile(r"^\${prefix}")
         path = p.sub(self.get_prefix(), path)
 
-        p = re.compile("^\${prefix:(.*?)}")
+        p = re.compile(r"^\${prefix:(.*?)}")
         m = p.match(path)
         if m:
             path = p.sub(self.get_prefix(m.group(1)), path)
 
-        p = re.compile("^\${project}")
+        p = re.compile(r"^\${project}")
         path = p.sub(self.project_dir, path)
 
-        p = re.compile("\${gtk}")
+        p = re.compile(r"\${gtk}")
         path = p.sub(self.meta.gtk, path)
 
-        p = re.compile("\${gtkdir}")
+        p = re.compile(r"\${gtkdir}")
         path = p.sub(self.get_gtk_dir(), path)
 
-        p = re.compile("\${gtkversion}")
+        p = re.compile(r"\${gtkversion}")
         path = p.sub(self.get_gtk_version(), path)
 
         try:
-            p = re.compile("\${name}")
+            p = re.compile(r"\${name}")
             path = p.sub(self.name, path)
         except AttributeError:
-            pass # can be used before name path is set
+            pass  # can be used before name path is set
 
         if include_bundle:
             try:
-                p = re.compile("^\${bundle}")
+                p = re.compile(r"^\${bundle}")
                 path = p.sub(self.get_bundle_path(), path)
             except AttributeError:
-                pass # can be used before bundle path is set
+                pass  # can be used before bundle path is set
 
         path = utils.evaluate_environment_variables(path)
         path = utils.evaluate_pkgconfig_variables(path)
@@ -306,7 +323,7 @@ class Project:
         plist = utils.node_get_element_by_tag_name(self.root, "plist")
         if not plist:
             raise Exception("The 'plist' tag is required")
-        return  self.evaluate_path(utils.node_get_string(plist))
+        return self.evaluate_path(utils.node_get_string(plist))
 
     def get_launcher_script(self):
         node = utils.node_get_element_by_tag_name(self.root, "launcher-script")
@@ -396,7 +413,8 @@ class Project:
         for node in nodes:
             data.append(Data.from_node(node))
         return data
-            
+
+
 if __name__ == '__main__':
     project = Project(os.path.join(os.getcwd(), 'giggle.bundle'))
 
@@ -429,4 +447,3 @@ if __name__ == '__main__':
     print "Binaries:"
     for binary in project.get_binaries():
         print "  %s => %s" % (binary.source, binary.dest)
-

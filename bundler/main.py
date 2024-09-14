@@ -1,7 +1,9 @@
-import sys, os
+import sys
+import os
 
 from project import *
 from bundler import *
+
 
 def main(argv):
     if len(argv) != 1:

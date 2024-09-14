@@ -1,12 +1,16 @@
 import sys
-import os, errno, glob
-import dircache, shutil
+import os
+import errno
+import glob
+import dircache
+import shutil
 import re
 from plistlib import Plist
 from distutils import dir_util, file_util
 
 from project import *
 import utils
+
 
 class Bundler:
     def __init__(self, project):
@@ -20,27 +24,28 @@ class Bundler:
         # List of paths that should be recursively searched for
         # binaries that are used to find library dependencies.
         self.binary_paths = []
-        #List of frameworks moved into the bundle which need to be set
-        #up for private use.
+        # List of frameworks moved into the bundle which need to be set
+        # up for private use.
         self.frameworks = []
 
         # Create the bundle in a temporary location first and move it
         # to the final destination when done.
         self.meta = project.get_meta()
-        self.bundle_path = os.path.join(self.meta.dest, "." + project.get_name() + ".app")
+        self.bundle_path = os.path.join(
+            self.meta.dest, "." + project.get_name() + ".app")
 
     def recursive_rm(self, dirname):
         # Extra safety ;)
-        if dirname in [ "/", os.getenv("HOME"), os.path.join(os.getenv("HOME"), "Desktop"), self.meta.dest ]:
+        if dirname in ["/", os.getenv("HOME"), os.path.join(os.getenv("HOME"), "Desktop"), self.meta.dest]:
             print "Eek, trying to remove a bit much, eh? (%s)" % (dirname)
             sys.exit(1)
 
         if not os.path.exists(dirname):
             return
-        
+
         files = dircache.listdir(dirname)
         for file in files:
-            path = os.path.join (dirname, file)
+            path = os.path.join(dirname, file)
             if os.path.isdir(path):
                 self.recursive_rm(path)
             else:
@@ -57,7 +62,7 @@ class Bundler:
     def create_pkglist(self):
         path = self.project.get_bundle_path("Contents", "PkgInfo")
         path = self.project.evaluate_path(path)
-        f = open (path, "w")
+        f = open(path, "w")
         f.write(self.plist.CFBundlePackageType)
         f.write(self.plist.CFBundleSignature)
         f.close()
@@ -71,9 +76,9 @@ class Bundler:
         # Create a temporary pangorc file just for creating the
         # modules file with the right modules.
         modulespath = self.project.get_bundle_path("Contents/Resources/lib/pango/" +
-                                                   "${pkg:pango:pango_module_version}/"+
+                                                   "${pkg:pango:pango_module_version}/" +
                                                    "modules")
-        modulespath = utils.evaluate_pkgconfig_variables (modulespath)
+        modulespath = utils.evaluate_pkgconfig_variables(modulespath)
 
         import tempfile
         fd, tmp_filename = tempfile.mkstemp()
@@ -118,10 +123,11 @@ class Bundler:
 
     def create_gtk_immodules_setup(self):
         path = self.project.get_bundle_path("Contents/Resources")
-        cmd = "GTK_EXE_PREFIX=" + path + " gtk-query-immodules-" + self.project.get_gtk_version()
+        cmd = "GTK_EXE_PREFIX=" + path + " gtk-query-immodules-" + \
+            self.project.get_gtk_version()
         f = os.popen(cmd)
 
-        path = self.project.get_bundle_path("Contents/Resources/etc/", 
+        path = self.project.get_bundle_path("Contents/Resources/etc/",
                                             self.project.get_gtk_dir())
         utils.makedirs(path)
         fout = open(os.path.join(path, "gtk.immodules"), "w")
@@ -143,29 +149,30 @@ class Bundler:
 
     def create_gdk_pixbuf_loaders_setup(self):
         modulespath = ""
-        if os.path.exists(os.path.join(self.project.get_prefix(), "lib", 
+        if os.path.exists(os.path.join(self.project.get_prefix(), "lib",
                                        "gdk-pixbuf-2.0")):
 
             modulespath = self.project.get_bundle_path("Contents/Resources/lib/",
-                                                     "gdk-pixbuf-2.0", 
-                                                     "${pkg:gdk-pixbuf-2.0:gdk_pixbuf_binary_version}",
-                                                     "loaders")
-        elif os.path.exists(os.path.join(self.project.get_prefix(), "lib", 
-                                       "gdk-pixbuf-3.0")):
+                                                       "gdk-pixbuf-2.0",
+                                                       "${pkg:gdk-pixbuf-2.0:gdk_pixbuf_binary_version}",
+                                                       "loaders")
+        elif os.path.exists(os.path.join(self.project.get_prefix(), "lib",
+                                         "gdk-pixbuf-3.0")):
             modulespath = self.project.get_bundle_path("Contents/Resources/lib/",
-                                                     "gdk-pixbuf-3.0", 
-                                                     "${pkg:gdk-pixbuf-3.0:gdk_pixbuf_binary_version}",
-                                                     "loaders")
+                                                       "gdk-pixbuf-3.0",
+                                                       "${pkg:gdk-pixbuf-3.0:gdk_pixbuf_binary_version}",
+                                                       "loaders")
         else:
             modulespath = self.project.get_bundle_path("Contents/Resources/lib/",
-                                                   self.project.get_gtk_dir(),
-                                                   "${pkg:" + self.meta.gtk + ":gtk_binary_version}",
-                                                   "loaders")
-        modulespath = utils.evaluate_pkgconfig_variables (modulespath)
+                                                       self.project.get_gtk_dir(),
+                                                       "${pkg:" + self.meta.gtk +
+                                                       ":gtk_binary_version}",
+                                                       "loaders")
+        modulespath = utils.evaluate_pkgconfig_variables(modulespath)
         cmd = "GDK_PIXBUF_MODULEDIR=" + modulespath + " gdk-pixbuf-query-loaders"
         f = os.popen(cmd)
 
-        path = self.project.get_bundle_path("Contents/Resources/etc/", 
+        path = self.project.get_bundle_path("Contents/Resources/etc/",
                                             self.project.get_gtk_dir())
         utils.makedirs(path)
         fout = open(os.path.join(path, "gdk-pixbuf.loaders"), "w")
@@ -210,11 +217,13 @@ class Bundler:
             # Source must begin with a prefix if we don't have a
             # dest. Skip past the source prefix and replace it with
             # the right bundle path instead.
-            p = re.compile("^\${prefix(:.*?)?}/")
+            p = re.compile(r"^\${prefix(:.*?)?}/")
             m = p.match(Path.source)
             if m:
-                relative_dest = self.project.evaluate_path(Path.source[m.end():])
-                dest = self.project.get_bundle_path("Contents/Resources", relative_dest)
+                relative_dest = self.project.evaluate_path(
+                    Path.source[m.end():])
+                dest = self.project.get_bundle_path(
+                    "Contents/Resources", relative_dest)
             else:
                 print "Invalid bundle file, missing or invalid 'dest' property: " + Path.dest
                 sys.exit(1)
@@ -223,7 +232,7 @@ class Bundler:
         utils.makedirs(dest_parent)
 
         # Check that the source only has wildcards in the last component.
-        p = re.compile("[\*\?]")
+        p = re.compile(r"[\*\?]")
         (source_parent, source_tail) = os.path.split(source)
         if p.search(source_parent):
             print "Can't have wildcards except in the last path component: " + source
@@ -252,7 +261,7 @@ class Bundler:
                 for globbed_source in glob.glob(os.path.join(root,
                                                              source_tail)):
                     try:
-#                        print "Copying %s to %s" % (globbed_source, destdir)
+                        #                        print "Copying %s to %s" % (globbed_source, destdir)
                         shutil.copy(globbed_source, destdir)
                     except EnvironmentError, e:
                         if e.errno == errno.ENOENT:
@@ -260,24 +269,24 @@ class Bundler:
                         elif e.errno == errno.EEXIST:
                             print "Warning, path already exits: " + dest
                         else:
-                            print "Error %s when copying file: %s" % ( str(e), globbed_source )
+                            print "Error %s when copying file: %s" % (str(e), globbed_source)
                             sys.exit(1)
 
         else:
             for globbed_source in glob.glob(source):
                 try:
                     if os.path.isdir(globbed_source):
-                        #print "dir: %s => %s" % (globbed_source, dest)
-                        dir_util.copy_tree (str(globbed_source), str(dest),
-                                            preserve_mode=1,
-                                            preserve_times=1,
-                                            preserve_symlinks=1,
-                                            update=1,
-                                            verbose=1,
-                                            dry_run=0)
+                        # print "dir: %s => %s" % (globbed_source, dest)
+                        dir_util.copy_tree(str(globbed_source), str(dest),
+                                           preserve_mode=1,
+                                           preserve_times=1,
+                                           preserve_symlinks=1,
+                                           update=1,
+                                           verbose=1,
+                                           dry_run=0)
                     else:
-                        #print "file: %s => %s" % (globbed_source, dest)
-                        file_util.copy_file (str(globbed_source), str(dest),
+                        # print "file: %s => %s" % (globbed_source, dest)
+                        file_util.copy_file(str(globbed_source), str(dest),
                                             preserve_mode=1,
                                             preserve_times=1,
                                             update=1,
@@ -290,7 +299,7 @@ class Bundler:
                     elif e.errno == errno.EEXIST:
                         print "Warning, path already exits: " + dest
                     else:
-                        print "Error %s when copying file: %s" %( str(e), globbed_source )
+                        print "Error %s when copying file: %s" % (str(e), globbed_source)
                         sys.exit(1)
         return dest
 
@@ -307,7 +316,7 @@ class Bundler:
 
         # FIXME: Should filter this list so it only contains .so,
         # .dylib, and executable binaries.
-        #return filter(lambda l: l.endswith(".so") or l.endswith(".dylib") or os.access(l, os.X_OK), paths)
+        # return filter(lambda l: l.endswith(".so") or l.endswith(".dylib") or os.access(l, os.X_OK), paths)
         paths = list(set(paths))
         return paths
 
@@ -321,7 +330,7 @@ class Bundler:
         n_paths = 0
         paths = self.list_copied_binaries()
         while n_paths != len(paths):
-            cmds = [ "otool -L " ]
+            cmds = ["otool -L "]
             for path in paths:
                 cmds.append(path + " ")
 
@@ -347,7 +356,7 @@ class Bundler:
                     for prefix in prefixes.values():
                         if prefix in line:
                             return True
-                    
+
                     if not line.startswith("/usr/lib") and not line.startswith("/System/Library"):
                         print "Warning, library not available in any prefix:", line.strip().split()[0]
 
@@ -357,14 +366,14 @@ class Bundler:
 
             lines = filter(prefix_filter, [line.strip() for line in f])
             lines = map(relative_path_map, lines)
-#When you need to track down errors, uncomment this blocK
+# When you need to track down errors, uncomment this blocK
 #            for path in paths:
 #                cmd = "otool -L %s" % path
 #                print path
 #                f = os.popen(cmd)
 #                lines = filter(prefix_filter, [line.strip() for line in f])
 
-            p = re.compile("(.*\.dylib\.?.*)\s\(compatibility.*$")
+            p = re.compile(r"(.*\.dylib\.?.*)\s\(compatibility.*$")
             lines = utils.filterlines(p, lines)
 
             new_libraries = []
@@ -373,7 +382,8 @@ class Bundler:
                 # create a Path object.
                 for (key, value) in prefixes.items():
                     if library.startswith(value):
-                        path = Path("${prefix:" + key + "}" + library[len(value):])
+                        path = Path("${prefix:" + key + "}" +
+                                    library[len(value):])
                         new_libraries.append(path)
 
             n_paths = len(paths)
@@ -381,7 +391,7 @@ class Bundler:
             if n_iterations > 10:
                 print "Too many tries to resolve library dependencies"
                 sys.exit(1)
-            
+
             self.copy_binaries(new_libraries)
             paths = self.list_copied_binaries()
 
@@ -396,13 +406,14 @@ class Bundler:
             prefix_path = self.project.get_prefix(prefix)
             print "Going through prefix: " + prefix_path
             for path in paths:
-                cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + " " + path + " " + prefix_path + " Resources" + " change"
+                cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + \
+                    " " + path + " " + prefix_path + " Resources" + " change"
                 f = os.popen(cmd)
                 for line in f:
                     print line
 
         # Then change the id of all libraries. Skipping this part for now
-        #for path in paths:
+        # for path in paths:
         #    cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-id.sh") + " " + path
         #    print cmd
         #    f = os.popen(cmd)
@@ -414,27 +425,29 @@ class Bundler:
             fwl = os.path.join(framework, fw_name)
             print "Importing Framework: " + fwl
 # Fix the framework IDs
-            cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + " " + fwl + " " + fw_name + " Frameworks" + " id"
+            cmd = os.path.join(os.path.dirname(
+                __file__), "run-install-name-tool-change.sh") + " " + fwl + " " + fw_name + " Frameworks" + " id"
             f = os.popen(cmd)
             for line in f:
                 print line
 # Fix the dependencies in other libraries
             for path in paths:
-                cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + " " + path + " " + fw_name + " Frameworks/" + fw_name + " change"
+                cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + \
+                    " " + path + " " + fw_name + " Frameworks/" + fw_name + " change"
                 f = os.popen(cmd)
                 for line in f:
                     print line
-#fix the dependencies in frameworks
+# fix the dependencies in frameworks
             for ufw in self.frameworks:
                 ufw_name, ext = os.path.splitext(os.path.basename(ufw))
                 if ufw_name == fw_name:
                     continue
                 ufwl = os.path.join(ufw, ufw_name)
-                cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + " " + ufwl + " " + fw_name + " Frameworks/" + fw_name + " change"
+                cmd = os.path.join(os.path.dirname(__file__), "run-install-name-tool-change.sh") + \
+                    " " + ufwl + " " + fw_name + " Frameworks/" + fw_name + " change"
                 f = os.popen(cmd)
                 for line in f:
                     print line
-
 
     def strip_debugging(self):
         paths = self.list_copied_binaries()
@@ -459,7 +472,7 @@ class Bundler:
         for theme in themes:
             if theme.icons == IconTheme.ICONS_NONE:
                 continue
-            
+
             for root, dirs, files in os.walk(self.project.evaluate_path(theme.source)):
                 for f in files:
                     (head, tail) = os.path.splitext(f)
@@ -503,14 +516,14 @@ class Bundler:
 
         # Generate icon caches.
         for theme in themes:
-            path = self.project.get_bundle_path("Contents/Resources/share/icons", theme.name)
+            path = self.project.get_bundle_path(
+                "Contents/Resources/share/icons", theme.name)
             cmd = "gtk-update-icon-cache -f " + path + " 2>/dev/null"
             os.popen(cmd)
 
     def copy_translations(self):
         translations = self.project.get_translations()
         prefix = self.project.get_prefix()
-
 
         def name_filter(filename):
             path, fname = os.path.split(filename)
@@ -532,16 +545,16 @@ class Bundler:
             for root, trees, files in os.walk(source):
                 for file in filter(name_filter, files):
                     path = os.path.join(root, file)
-                    self.copy_path(Path("${prefix}" + path[len(prefix):], 
+                    self.copy_path(Path("${prefix}" + path[len(prefix):],
                                         program.dest))
-
 
     def run(self):
         # Remove the temp location forcefully.
         path = self.project.evaluate_path(self.bundle_path)
         self.recursive_rm(path)
 
-        final_path = os.path.join(self.meta.dest, self.project.get_name() + ".app")
+        final_path = os.path.join(
+            self.meta.dest, self.project.get_name() + ".app")
         final_path = self.project.evaluate_path(final_path)
 
         if not self.meta.overwrite and os.path.exists(final_path):
@@ -577,7 +590,7 @@ class Bundler:
         # Data
         for path in self.project.get_data():
             self.copy_path(path)
-        
+
         # Translations
         self.copy_translations()
 
@@ -596,11 +609,12 @@ class Bundler:
         if self.meta.run_install_name_tool:
             self.run_install_name_tool()
 
-        #self.strip_debugging()
+        # self.strip_debugging()
 
         if self.meta.overwrite:
             self.recursive_rm(final_path)
         shutil.move(self.project.get_bundle_path(), final_path)
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
